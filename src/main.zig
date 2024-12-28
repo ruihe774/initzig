@@ -246,6 +246,11 @@ pub fn main() !u8 {
     try posix.chdir("/");
     try posix.dup2(sfd, 3);
     sfd = 3;
+    if (posix.open("/dev/null", .RDWR, 0)) |null_fd| {
+        try posix.dup2(null_fd, 0);
+        try posix.dup2(null_fd, 1);
+        try posix.dup2(null_fd, 2);
+    }
     switch (posix.errno(linux.syscall3(.close_range, @intCast(sfd + 1), std.math.maxInt(u32), 0))) {
         .SUCCESS => {},
         else => |err| return posix.unexpectedErrno(err),
