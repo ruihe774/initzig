@@ -254,10 +254,10 @@ pub fn main() !u8 {
     const kill_target = if (kill_pgid) -child_pid else child_pid;
     var child_exitcode: i32 = -1;
     while (child_exitcode < 0) {
-        var buf: [@sizeOf(posix.siginfo_t)]u8 = undefined;
+        var buf: [@sizeOf(linux.signalfd_siginfo)]u8 = undefined;
         const n = try posix.read(sfd, &buf);
-        std.debug.assert(n == @sizeOf(posix.siginfo_t));
-        const ssi: posix.siginfo_t = @bitCast(buf);
+        std.debug.assert(n == @sizeOf(linux.signalfd_siginfo));
+        const ssi: linux.signalfd_siginfo = @bitCast(buf);
 
         switch (ssi.signo) {
             SIG.TSTP, SIG.TTOU, SIG.TTIN => {},
