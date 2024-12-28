@@ -1,11 +1,11 @@
 const std = @import("std");
-const linux = std.os.linux;
-const posix = std.posix;
-const SIG = posix.SIG;
-const mem = std.mem;
 const fmt = std.fmt;
 const heap = std.heap;
 const io = std.io;
+const linux = std.os.linux;
+const mem = std.mem;
+const posix = std.posix;
+const SIG = posix.SIG;
 
 const getopt = @import("getopt").getopt;
 
@@ -219,7 +219,7 @@ pub fn main() !u8 {
             argv[i] = arg;
         }
         const envp = try std.process.createEnvironFromExisting(arena, @ptrCast(std.os.environ.ptr), .{});
-        var c_arg = child_arg{
+        var c_arg_s = child_arg{
             .arena = arena,
             .parent_pid = cur_pid,
             .sigmask = &child_sigmask,
@@ -227,9 +227,10 @@ pub fn main() !u8 {
             .envp = envp,
             .returned_error = null,
         };
+        const c_arg: *volatile child_arg = &c_arg_s;
 
         var stub: i32 = undefined;
-        const rc = linux.clone(spawn_pid1, @intFromPtr(&stack) + alloc_size, linux.CLONE.VM | linux.CLONE.VFORK | SIG.CHLD, @intFromPtr(&c_arg), &stub, 0, &stub);
+        const rc = linux.clone(spawn_pid1, @intFromPtr(&stack) + alloc_size, linux.CLONE.VM | linux.CLONE.VFORK | SIG.CHLD, @intFromPtr(c_arg), &stub, 0, &stub);
         switch (posix.errno(rc)) {
             .SUCCESS => child_pid = @intCast(rc),
             else => |err| return posix.unexpectedErrno(err),
