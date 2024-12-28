@@ -246,7 +246,7 @@ pub fn main() !u8 {
     try posix.chdir("/");
     try posix.dup2(sfd, 3);
     sfd = 3;
-    if (posix.open("/dev/null", .RDWR, 0)) |null_fd| {
+    if (posix.open("/dev/null", .{.ACCMODE = .RDWR}, 0) catch null) |null_fd| {
         try posix.dup2(null_fd, 0);
         try posix.dup2(null_fd, 1);
         try posix.dup2(null_fd, 2);
@@ -272,11 +272,31 @@ pub fn main() !u8 {
                     if (signo == SIG.TERM or signo == SIG.INT)
                         return 0;
                 } else {
-                    posix.kill(kill_target, @intCast(signo)) catch |err| {
-                        if (err != error.ProcessNotFound) {
-                            return err;
-                        }
-                    };
+                    switch (ssi.code) {
+                        0 => {
+                            // SI_USER
+                            posix.kill(kill_target, @intCast(signo)) catch |err| {
+                                if (err != error.ProcessNotFound) {
+                                    return err;
+                                }
+                            };
+                        },
+                        -1 => {
+                            // SI_QUEUE
+                            var info  = mem.zeroes(linux.siginfo_t);
+                            info.signo = @bitCast(signo);
+                            info.code = -1;
+                            info.fields.common.first.piduid.pid = @bitCast(ssi.pid);
+                            info.fields.common.first.piduid.uid = ssi.uid;
+                            info.fields.common.second.value.int = ssi.int;
+                            info.fields.common.second.value.ptr = @ptrFromInt(ssi.ptr);
+                            switch (posix.errno(linux.syscall3(.rt_sigqueueinfo, @intCast(child_pid), signo, @intFromPtr(&info)))) {
+                                .SUCCESS, .SRCH => {},
+                                else => |err| return posix.unexpectedErrno(err),
+                            }
+                        },
+                        else => {},
+                    }
                 }
             },
         }
