@@ -1,0 +1,15 @@
+.{
+    .name = "initzig",
+    .version = "0.1.0",
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+    .dependencies = .{
+        .getopt = .{
+            .url = "git+https://github.com/psyomn/zig-getopt.git?ref=psyomn/zig-0.13.0#d220a4bd55a07bb16c5b3c8e14108c9c3eaccccf",
+            .hash = "12202438d5674900cec759744cc052acb320cb72a36eb8b2878228777ed2ea85f027",
+        }
+    },
+}
