@@ -1,11 +1,11 @@
 const std = @import("std");
-const linux = std.os.linux;
-const posix = std.posix;
-const SIG = posix.SIG;
-const mem = std.mem;
 const fmt = std.fmt;
 const heap = std.heap;
 const io = std.io;
+const linux = std.os.linux;
+const mem = std.mem;
+const posix = std.posix;
+const SIG = posix.SIG;
 
 const getopt = @import("getopt").getopt;
 
@@ -245,7 +245,7 @@ pub fn main() !u8 {
     try posix.chdir("/");
     try posix.dup2(sfd, 3);
     sfd = 3;
-    if (posix.open("/dev/null", .{.ACCMODE = .RDWR}, 0) catch null) |null_fd| {
+    if (posix.open("/dev/null", .{ .ACCMODE = .RDWR }, 0) catch null) |null_fd| {
         try posix.dup2(null_fd, 0);
         try posix.dup2(null_fd, 1);
         try posix.dup2(null_fd, 2);
@@ -282,7 +282,7 @@ pub fn main() !u8 {
                         },
                         -1 => {
                             // SI_QUEUE
-                            var info  = mem.zeroes(linux.siginfo_t);
+                            var info = mem.zeroes(linux.siginfo_t);
                             info.signo = @bitCast(signo);
                             info.code = -1;
                             info.fields.common.first.piduid.pid = @bitCast(ssi.pid);
