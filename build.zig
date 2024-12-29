@@ -1,19 +1,32 @@
 const std = @import("std");
 
 pub fn build(b: *std.Build) void {
-    const target = b.standardTargetOptions(.{});
+    const target = b.standardTargetOptions(.{
+        .default_target = .{
+            .cpu_model = .baseline,
+        }
+    });
     const optimize = b.standardOptimizeOption(.{
         .preferred_optimize_mode = .ReleaseSafe
     });
 
-    const exe = b.addExecutable(.{
+    var options = std.Build.ExecutableOptions {
         .name = "initzig",
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
         .single_threaded = true,
-    });
+        .link_libc = false,
+        .linkage = .static,
+        .pic = false,
+    };
+    if (optimize != .Debug) {
+        options.unwind_tables = false;
+        options.omit_frame_pointer = true;
+        options.error_tracing = false;
+    }
 
+    const exe = b.addExecutable(options);
 
     const getopt = b.dependency("getopt", .{
         .target = target,
