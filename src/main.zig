@@ -203,12 +203,10 @@ pub fn main() !u8 {
 
     var child_pid: posix.pid_t = 0;
     if (!run_as_pause) {
-        const alloc_size = 0x8000;
-        const bufs = try heap.page_allocator.alloc([alloc_size]u8, 2);
-        defer heap.page_allocator.free(bufs);
-        var buf = bufs[0];
-        const stack = bufs[1];
-        var buf_allocator = heap.FixedBufferAllocator.init(&buf);
+        const stack_size = 0x8000;
+        const buf = try heap.page_allocator.alloc(u8, stack_size * 2);
+        defer heap.page_allocator.free(buf);
+        var buf_allocator = heap.FixedBufferAllocator.init(buf);
         const arena = buf_allocator.allocator();
         const args = maybe_args orelse {
             usage();
@@ -228,8 +226,9 @@ pub fn main() !u8 {
             .returned_error = null,
         };
 
+        const stack = try arena.alloc(u8, stack_size);
         var stub: i32 = undefined;
-        const rc = linux.clone(spawn_pid1, @intFromPtr(&stack) + alloc_size, linux.CLONE.VM | linux.CLONE.VFORK | SIG.CHLD, @intFromPtr(&c_arg), &stub, 0, &stub);
+        const rc = linux.clone(spawn_pid1, @intFromPtr(stack.ptr) + stack_size, linux.CLONE.VM | linux.CLONE.VFORK | SIG.CHLD, @intFromPtr(&c_arg), &stub, 0, &stub);
         switch (posix.errno(rc)) {
             .SUCCESS => child_pid = @intCast(rc),
             else => |err| return posix.unexpectedErrno(err),
