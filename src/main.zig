@@ -197,7 +197,7 @@ pub fn main() !u8 {
 
     var init_sigmask = linux.all_mask;
     var child_sigmask = posix.empty_sigset;
-    for (kernel_signals) |sig| {
+    inline for (kernel_signals) |sig| {
         sigdelset(&init_sigmask, sig);
     }
     posix.sigprocmask(SIG.SETMASK, &init_sigmask, &child_sigmask);
