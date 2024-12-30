@@ -154,6 +154,13 @@ fn reap_zombies(child_pid: posix.pid_t, child_exitcode: *i32) !void {
     }
 }
 
+pub fn dupeWithSentinel(allocator: mem.Allocator, comptime T: type, m: []const T, comptime s: T) ![:s]T {
+    const new_buf = try allocator.alloc(T, m.len + 1);
+    @memcpy(new_buf[0..m.len], m);
+    new_buf[m.len] = s;
+    return new_buf[0..m.len :s];
+}
+
 pub fn main() !u8 {
     var kill_pgid = false;
     var run_as_pause = false;
@@ -212,11 +219,8 @@ pub fn main() !u8 {
             usage();
             return 1;
         };
-        const argv = try arena.allocSentinel(?[*:0]const u8, args.len, null);
-        for (args, 0..) |arg, i| {
-            argv[i] = arg;
-        }
-        const envp = try std.process.createEnvironFromExisting(arena, @ptrCast(std.os.environ.ptr), .{});
+        const argv = try dupeWithSentinel(arena, ?[*:0]const u8, args, null);
+        const envp = try dupeWithSentinel(arena, ?[*:0]const u8, std.os.environ, null);
         var c_arg = child_arg{
             .arena = arena,
             .parent_pid = cur_pid,
