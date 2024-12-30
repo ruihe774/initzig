@@ -52,16 +52,16 @@ fn usage() void {
     io.getStdErr().writer().print("usage: {s} [-ghLPV] [--] <progname> [<arguments>...]\n", .{std.os.argv[0]}) catch unreachable;
 }
 
-const kernel_signals = [_]u32{ SIG.FPE, SIG.ILL, SIG.SEGV, SIG.BUS, SIG.ABRT, SIG.TRAP, SIG.SYS };
+const kernel_signals = [_]u5{ SIG.FPE, SIG.ILL, SIG.SEGV, SIG.BUS, SIG.ABRT, SIG.TRAP, SIG.SYS };
 
-fn sigaddset(set: *posix.sigset_t, sig: u32) void {
+fn sigaddset(set: *posix.sigset_t, sig: u5) void {
     const s = sig - 1;
-    set[s / @bitSizeOf(u32)] |= @as(u32, 1) << @intCast(s & @bitSizeOf(u32) - 1);
+    set[@as(u32, s) / @bitSizeOf(u32)] |= @as(u32, 1) << s;
 }
 
-fn sigdelset(set: *posix.sigset_t, sig: u32) void {
+fn sigdelset(set: *posix.sigset_t, sig: u5) void {
     const s = sig - 1;
-    set[s / @bitSizeOf(u32)] &= ~(@as(u32, 1) << @intCast(s & @bitSizeOf(u32) - 1));
+    set[@as(u32, s) / @bitSizeOf(u32)] &= ~(@as(u32, 1) << s);
 }
 
 const child_arg = struct {
@@ -215,6 +215,7 @@ pub fn main() !u8 {
         defer heap.page_allocator.free(buf);
         var buf_allocator = heap.FixedBufferAllocator.init(buf);
         const arena = buf_allocator.allocator();
+        const stack = try arena.alloc(u8, stack_size);
         const args = maybe_args orelse {
             usage();
             return 1;
@@ -230,7 +231,16 @@ pub fn main() !u8 {
             .returned_error = null,
         };
 
-        const stack = try arena.alloc(u8, stack_size);
+        var old_actions: [@typeInfo(@TypeOf(kernel_signals)).Array.len]posix.Sigaction = undefined;
+        std.debug.assert(SIG.DFL == null);
+        inline for (kernel_signals, &old_actions) |sig, *oldact| {
+            const newact = mem.zeroes(posix.Sigaction);
+            try posix.sigaction(sig, &newact, oldact);
+        }
+        defer inline for (kernel_signals, old_actions) |sig, oldact| {
+            posix.sigaction(sig, &oldact, null) catch {};
+        };
+
         var stub: i32 = undefined;
         const rc = linux.clone(spawn_pid1, @intFromPtr(stack.ptr) + stack_size, linux.CLONE.VM | linux.CLONE.VFORK | SIG.CHLD, @intFromPtr(&c_arg), &stub, 0, &stub);
         switch (posix.errno(rc)) {
