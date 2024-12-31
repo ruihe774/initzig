@@ -234,16 +234,6 @@ pub fn main() !u8 {
             .returned_error = null,
         };
 
-        var old_actions: [@typeInfo(@TypeOf(kernel_signals)).Array.len]posix.Sigaction = undefined;
-        std.debug.assert(SIG.DFL == null);
-        inline for (kernel_signals, &old_actions) |sig, *oldact| {
-            const newact = mem.zeroes(posix.Sigaction);
-            try posix.sigaction(sig, &newact, oldact);
-        }
-        defer inline for (kernel_signals, old_actions) |sig, oldact| {
-            posix.sigaction(sig, &oldact, null) catch {};
-        };
-
         var stub: i32 = undefined;
         const rc = linux.clone(spawn_pid1, @intFromPtr(stack.ptr) + stack_size, linux.CLONE.VM | linux.CLONE.VFORK | SIG.CHLD, @intFromPtr(&c_arg), &stub, 0, &stub);
         switch (posix.errno(rc)) {
