@@ -91,7 +91,7 @@ fn rewrite_listen_pid_env(arena: mem.Allocator, envp: [*:null]?[*:0]const u8, pa
     }
 }
 
-fn make_foreground(sigmask: *posix.sigset_t) !void {
+fn make_foreground() !void {
     switch (posix.errno(linux.syscall2(.setpgid, 0, 0))) {
         .SUCCESS => {},
         else => |err| return posix.unexpectedErrno(err),
@@ -106,9 +106,12 @@ fn make_foreground(sigmask: *posix.sigset_t) !void {
         .SUCCESS, .NOTTY, .BADF, .NXIO => {},
         else => |err| return posix.unexpectedErrno(err),
     }
-    sigaddset(sigmask, SIG.TSTP);
-    sigaddset(sigmask, SIG.TTOU);
-    sigaddset(sigmask, SIG.TTIN);
+    const ignored_signals = [_]u5{SIG.TSTP, SIG.TTOU, SIG.TTIN};
+    inline for (ignored_signals) |sig| {
+        var newact = mem.zeroes(posix.Sigaction);
+        newact.handler.handler = SIG.IGN;
+        try posix.sigaction(sig, &newact, null);
+    }
 }
 
 fn spawn_pid1_inner(
@@ -119,7 +122,7 @@ fn spawn_pid1_inner(
     envp: [*:null]?[*:0]const u8,
 ) !noreturn {
     try rewrite_listen_pid_env(arena, envp, parent_pid);
-    try make_foreground(sigmask);
+    try make_foreground();
     posix.sigprocmask(SIG.SETMASK, sigmask, null);
     return posix.execvpeZ(argv[0].?, argv, envp);
 }
