@@ -112,17 +112,17 @@ fn rewrite_listen_pid_env(arena: mem.Allocator, envp: [*:null]?[*:0]const u8, pa
 }
 
 fn make_foreground() !void {
-    switch (posix.errno(linux.syscall2(.setpgid, 0, 0))) {
+    switch (linux.E.init(linux.syscall2(.setpgid, 0, 0))) {
         .SUCCESS => {},
         else => |err| return posix.unexpectedErrno(err),
     }
     const rc = linux.syscall1(.getpgid, 0);
-    const pgid: posix.pid_t = switch (posix.errno(rc)) {
+    const pgid: posix.pid_t = switch (linux.E.init(rc)) {
         .SUCCESS => @intCast(rc),
         else => |err| return posix.unexpectedErrno(err),
     };
     const ttyfd = posix.open("/dev/tty", .{ .ACCMODE = .RDWR, .CLOEXEC = true }, 0) catch 0;
-    switch (posix.errno(linux.tcsetpgrp(ttyfd, &pgid))) {
+    switch (linux.E.init(linux.tcsetpgrp(ttyfd, &pgid))) {
         .SUCCESS, .NOTTY, .BADF, .NXIO => {},
         else => |err| return posix.unexpectedErrno(err),
     }
@@ -159,7 +159,7 @@ fn reap_zombies(child_pid: posix.pid_t, child_exitcode: *i32) !void {
     while (true) {
         var wstatus: u32 = undefined;
         const rc = linux.waitpid(-1, &wstatus, linux.W.NOHANG);
-        const reap_pid: posix.pid_t = switch (posix.errno(rc)) {
+        const reap_pid: posix.pid_t = switch (linux.E.init(rc)) {
             .SUCCESS => @intCast(rc),
             .CHILD => break,
             else => |err| return posix.unexpectedErrno(err),
@@ -256,7 +256,7 @@ pub fn main() !u8 {
 
         var stub: i32 = undefined;
         const rc = linux.clone(spawn_pid1, @intFromPtr(stack.ptr) + stack_size, linux.CLONE.VM | linux.CLONE.VFORK | SIG.CHLD, @intFromPtr(&c_arg), &stub, 0, &stub);
-        switch (posix.errno(rc)) {
+        switch (linux.E.init(rc)) {
             .SUCCESS => child_pid = @intCast(rc),
             else => |err| return posix.unexpectedErrno(err),
         }
@@ -276,7 +276,7 @@ pub fn main() !u8 {
         try posix.dup2(null_fd, 1);
         try posix.dup2(null_fd, 2);
     }
-    switch (posix.errno(linux.syscall3(.close_range, @intCast(sfd + 1), std.math.maxInt(u32), 0))) {
+    switch (linux.E.init(linux.syscall3(.close_range, @intCast(sfd + 1), std.math.maxInt(u32), 0))) {
         .SUCCESS => {},
         else => |err| return posix.unexpectedErrno(err),
     }
@@ -315,7 +315,7 @@ pub fn main() !u8 {
                             info.fields.common.first.piduid.uid = ssi.uid;
                             info.fields.common.second.value.int = ssi.int;
                             info.fields.common.second.value.ptr = @ptrFromInt(ssi.ptr);
-                            switch (posix.errno(linux.syscall3(.rt_sigqueueinfo, @intCast(child_pid), signo, @intFromPtr(&info)))) {
+                            switch (linux.E.init(linux.syscall3(.rt_sigqueueinfo, @intCast(child_pid), signo, @intFromPtr(&info)))) {
                                 .SUCCESS, .SRCH => {},
                                 else => |err| return posix.unexpectedErrno(err),
                             }
