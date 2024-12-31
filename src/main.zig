@@ -73,14 +73,34 @@ const child_arg = struct {
     returned_error: ?anyerror,
 };
 
+fn parseDecimalZ(comptime T: type, buf: [*:0]const u8) !T {
+    var r: T = 0;
+    var i: usize = 0;
+    while (buf[i] != 0) : (i += 1) {
+        const ch = buf[i];
+        if (ch < '0' or ch > '9') {
+            return fmt.ParseIntError.InvalidCharacter;
+        }
+        const rmul = @mulWithOverflow(r, 10);
+        if (rmul[1] != 0) {
+            return fmt.ParseIntError.Overflow;
+        }
+        const radd = @addWithOverflow(rmul[0], ch - '0');
+        if (radd[1] != 0) {
+            return fmt.ParseIntError.Overflow;
+        }
+        r = radd[0];
+    }
+    return r;
+}
+
 fn rewrite_listen_pid_env(arena: mem.Allocator, envp: [*:null]?[*:0]const u8, parent_pid: posix.pid_t) !void {
     const prefix = "LISTEN_PID=";
     var i: usize = 0;
-    while (envp[i]) |l| : (i += 1) {
-        const line = l[0..mem.len(l)];
-        if (mem.startsWith(u8, line, prefix)) {
+    while (envp[i]) |line| : (i += 1) {
+        if (mem.eql(u8, line[0..prefix.len], prefix)) {
             const value = line[prefix.len..];
-            const orig_pid = fmt.parseUnsigned(u32, value, 10) catch {
+            const orig_pid = parseDecimalZ(u32, value) catch {
                 continue;
             };
             if (orig_pid == parent_pid) {
